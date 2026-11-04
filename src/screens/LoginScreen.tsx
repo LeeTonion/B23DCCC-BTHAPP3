@@ -72,16 +72,16 @@ export function LoginScreen({
       >
         <View style={styles.header}>
           <View style={styles.logoBadge}>
-            <Ionicons name="chatbubble-ellipses" size={32} color="#00F0FF" />
+            <Ionicons name="chatbubble-ellipses" size={30} color="#FFFFFF" />
           </View>
-          <Text style={styles.brand}>CYBER CHAT</Text>
+          <Text style={styles.brand}>Chat App</Text>
           <Text style={styles.title}>
-            {registering ? 'Tạo tài khoản mới' : 'Chào mừng trở lại'}
+            {registering ? 'Tạo tài khoản' : 'Chào mừng trở lại'}
           </Text>
           <Text style={styles.subtitle}>
             {registering
-              ? 'Đăng ký nhanh để kết nối mạng lưới chat neon'
-              : 'Kết nối và trò chuyện thời gian thực.'}
+              ? 'Đăng ký nhanh để kết nối cùng mọi người'
+              : 'Kết nối và trò chuyện cùng bạn bè thời gian thực.'}
           </Text>
         </View>
 
@@ -98,7 +98,7 @@ export function LoginScreen({
           {registering && (
             <LabeledInput
               label="Họ tên"
-              placeholder="Nhập tên hiển thị"
+              placeholder="Nhập tên hiển thị của bạn"
               value={name}
               onChangeText={setName}
               autoComplete="name"
@@ -107,7 +107,7 @@ export function LoginScreen({
 
           <LabeledInput
             label="Email"
-            placeholder="cyber@domain.com"
+            placeholder="example@gmail.com"
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -151,8 +151,8 @@ export function LoginScreen({
               busy
                 ? 'Đang xử lý…'
                 : registering
-                ? 'ĐĂNG KÝ TÀI KHOẢN'
-                : 'ĐĂNG NHẬP'
+                ? 'Đăng ký tài khoản'
+                : 'Đăng nhập'
             }
             onPress={submit}
             style={styles.submitBtn}
@@ -197,36 +197,35 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logoBadge: {
-    width: 66,
-    height: 66,
-    borderRadius: 22,
-    backgroundColor: '#0F182A',
-    borderWidth: 2,
-    borderColor: '#00F0FF',
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-    shadowColor: '#00F0FF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 14,
-    elevation: 8,
+    marginBottom: 14,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
   },
   brand: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#00F0FF',
-    letterSpacing: 3,
-    marginBottom: 6,
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: colors.text,
     textAlign: 'center',
   },
   subtitle: {
-    color: '#94A3B8',
+    color: colors.textMuted,
     fontSize: 14,
     marginTop: 6,
     textAlign: 'center',
@@ -234,23 +233,23 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   card: {
-    backgroundColor: '#111827',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 22,
     borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.25)',
-    shadowColor: '#00F0FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    borderColor: colors.border,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
     shadowRadius: 16,
-    elevation: 6,
+    elevation: 3,
   },
   alertBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 0, 85, 0.12)',
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: 'rgba(255, 0, 85, 0.4)',
+    borderColor: '#FECDD3',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -259,9 +258,9 @@ const styles = StyleSheet.create({
   },
   alertText: {
     flex: 1,
-    color: '#FF4D88',
+    color: colors.danger,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   submitBtn: {
     marginTop: 6,
@@ -270,14 +269,14 @@ const styles = StyleSheet.create({
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: 18,
   },
   linkText: {
-    color: '#94A3B8',
+    color: colors.textMuted,
     fontSize: 14,
   },
   linkHighlight: {
-    color: '#00F0FF',
+    color: colors.primary,
     fontWeight: '700',
   },
 });

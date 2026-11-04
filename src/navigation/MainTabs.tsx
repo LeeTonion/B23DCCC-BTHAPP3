@@ -46,23 +46,22 @@ export function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: '#64748B',
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarHideOnKeyboard: true,
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '700',
+          fontWeight: '600',
           paddingBottom: 4,
-          letterSpacing: 0.3,
         },
         tabBarStyle: {
-          backgroundColor: '#0C1322',
-          borderTopColor: '#1E293B',
+          backgroundColor: '#FFFFFF',
+          borderTopColor: colors.border,
           borderTopWidth: 1,
-          elevation: 12,
-          shadowColor: '#00F0FF',
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 6,
           height: 60,
           paddingTop: 6,
         },
@@ -77,9 +76,8 @@ export function MainTabs() {
           tabBarBadge: unread || undefined,
           tabBarBadgeStyle: {
             backgroundColor: colors.primary,
-            color: '#060A12',
             fontSize: 11,
-            fontWeight: '900',
+            fontWeight: '700',
           },
           tabBarIcon: chatIcon,
         }}

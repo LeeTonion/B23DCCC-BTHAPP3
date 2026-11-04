@@ -22,7 +22,6 @@ export function AppButton({
 }: AppButtonProps) {
   const isDanger = variant === 'danger';
   const bgColor = isDanger ? colors.danger : colors.primary;
-  const textColor = isDanger ? '#FFFFFF' : '#060A12';
 
   return (
     <Pressable
@@ -33,12 +32,12 @@ export function AppButton({
         {
           backgroundColor: bgColor,
           shadowColor: bgColor,
-          opacity: pressed ? 0.85 : 1,
+          opacity: pressed ? 0.88 : 1,
           transform: [{ scale: pressed ? 0.98 : 1 }],
         },
         style,
       ]}>
-      <Text style={[styles.text, { color: textColor }]}>{title}</Text>
+      <Text style={styles.text}>{title}</Text>
     </Pressable>
   );
 }
@@ -49,13 +48,14 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 15,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 14,
-    elevation: 8,
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 4,
   },
   text: {
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });

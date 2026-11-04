@@ -2,12 +2,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 
 const palette = [
-  { bg: '#082F49', ink: '#38BDF8', ring: '#00F0FF' }, // Neon Cyan
-  { bg: '#2E1065', ink: '#C084FC', ring: '#A855F7' }, // Neon Purple
-  { bg: '#064E3B', ink: '#34D399', ring: '#00FF9D' }, // Neon Mint
-  { bg: '#4C0519', ink: '#FB7185', ring: '#FF0055' }, // Neon Pink
-  { bg: '#451A03', ink: '#FBBF24', ring: '#F59E0B' }, // Neon Amber
-  { bg: '#1E1B4B', ink: '#818CF8', ring: '#6366F1' }, // Neon Indigo
+  { bg: '#EEF2FF', ink: '#4F46E5', ring: '#C7D2FE' },
+  { bg: '#ECFDF5', ink: '#059669', ring: '#A7F3D0' },
+  { bg: '#FFF1F2', ink: '#E11D48', ring: '#FECDD3' },
+  { bg: '#FAF5FF', ink: '#9333EA', ring: '#E9D5FF' },
+  { bg: '#FFFBEB', ink: '#D97706', ring: '#FDE68A' },
+  { bg: '#F0FDF4', ink: '#16A34A', ring: '#BBF7D0' },
+  { bg: '#EFF6FF', ink: '#2563EB', ring: '#BFDBFE' },
 ];
 
 interface Props {
@@ -43,7 +44,6 @@ export function Avatar({ name, size = 48, online = false, label }: Props) {
             backgroundColor: tint.bg,
             borderColor: tint.ring,
             borderWidth: 1.5,
-            shadowColor: tint.ring,
           },
         ]}
       >
@@ -80,13 +80,14 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   letters: {
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
   dot: {
@@ -94,11 +95,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: colors.success,
-    borderColor: '#090D16',
-    shadowColor: colors.success,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-    elevation: 4,
+    borderColor: '#FFFFFF',
+    elevation: 3,
   },
 });

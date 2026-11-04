@@ -25,7 +25,7 @@ export function LabeledInput({
     <View style={styles.field}>
       <Text style={[styles.label, focused && styles.labelFocused]}>{label}</Text>
       <TextInput
-        placeholderTextColor="#475569"
+        placeholderTextColor={colors.textMuted}
         onFocus={e => {
           setFocused(true);
           onFocus?.(e);
@@ -50,33 +50,37 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    color: '#94A3B8',
+    color: colors.text,
     fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 7,
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
+    fontWeight: '600',
+    marginBottom: 6,
+    letterSpacing: 0.2,
   },
   labelFocused: {
     color: colors.primary,
   },
   input: {
-    backgroundColor: '#0C1220',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#1E293B',
-    color: '#FFFFFF',
+    borderColor: colors.border,
+    color: colors.text,
     fontSize: 15,
     paddingHorizontal: 16,
     paddingVertical: 13,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
   },
   inputFocused: {
     borderColor: colors.primary,
-    backgroundColor: '#0F1829',
+    backgroundColor: '#FFFFFF',
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 2,
   },
 });

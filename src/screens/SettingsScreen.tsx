@@ -31,7 +31,7 @@ export function SettingsScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={styles.container}>
-      <Text style={styles.screenHeading}>CÀI ĐẶT</Text>
+      <Text style={styles.screenHeading}>Cài đặt</Text>
 
       <View style={styles.profileCard}>
         <Avatar name={displayName} size={76} online={true} />
@@ -42,7 +42,7 @@ export function SettingsScreen() {
       <View style={styles.sectionCard}>
         <View style={styles.row}>
           <View style={styles.iconCircle}>
-            <Ionicons name="notifications-outline" size={20} color="#00F0FF" />
+            <Ionicons name="notifications-outline" size={20} color={colors.primary} />
           </View>
           <Text style={styles.rowLabel}>Thông báo</Text>
           <Text style={styles.rowValue}>Bật</Text>
@@ -52,16 +52,16 @@ export function SettingsScreen() {
 
         <View style={styles.row}>
           <View style={styles.iconCircle}>
-            <Ionicons name="shield-checkmark-outline" size={20} color="#00FF9D" />
+            <Ionicons name="shield-checkmark-outline" size={20} color={colors.success} />
           </View>
           <Text style={styles.rowLabel}>Bảo mật</Text>
-          <Text style={[styles.rowValue, { color: '#00FF9D' }]}>Đã mã hoá</Text>
+          <Text style={[styles.rowValue, { color: colors.success }]}>Đã mã hoá</Text>
         </View>
       </View>
 
       <View style={styles.logoutSection}>
         <AppButton
-          title={busy ? 'ĐANG ĐĂNG XUẤT…' : 'ĐĂNG XUẤT'}
+          title={busy ? 'Đang đăng xuất…' : 'Đăng xuất'}
           variant="danger"
           onPress={submit}
         />
@@ -78,45 +78,50 @@ const styles = StyleSheet.create({
   },
   screenHeading: {
     fontSize: 28,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 1,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -0.5,
     marginTop: 14,
     marginBottom: 20,
   },
   profileCard: {
-    backgroundColor: '#111827',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     paddingVertical: 28,
     paddingHorizontal: 20,
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(0, 240, 255, 0.3)',
-    shadowColor: '#00F0FF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
-    elevation: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
     marginBottom: 16,
   },
   name: {
     fontSize: 20,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: colors.text,
     marginTop: 14,
     marginBottom: 4,
   },
   email: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: colors.textMuted,
   },
   sectionCard: {
-    backgroundColor: '#111827',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     paddingHorizontal: 18,
     paddingVertical: 6,
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
     marginBottom: 24,
   },
   row: {
@@ -129,9 +134,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#0F1A2E',
-    borderWidth: 1,
-    borderColor: '#1E293B',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -139,16 +142,16 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
-    color: '#F8FAFC',
+    color: colors.text,
   },
   rowValue: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: colors.textMuted,
     fontWeight: '600',
   },
   divider: {
     height: 1,
-    backgroundColor: '#1E293B',
+    backgroundColor: colors.border,
   },
   logoutSection: {
     marginTop: 'auto',
