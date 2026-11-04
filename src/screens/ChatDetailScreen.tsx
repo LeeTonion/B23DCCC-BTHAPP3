@@ -1,0 +1,791 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
+import { Ionicons } from '@react-native-vector-icons/ionicons/static';
+import {
+  ActivityIndicator,
+  Alert,
+  AppState,
+  FlatList,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type FlatListProps,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Avatar } from '../components/Avatar';
+import { MessageStatus } from '../components/MessageStatus';
+import { useAuth } from '../context/AuthContext';
+import { useChatData } from '../context/ChatContext';
+import {
+  conversationId,
+  markRead,
+  timeLabel,
+  type Message,
+} from '../services/chat';
+import {
+  dateDivider,
+  deliveryLabels,
+  deliveryState,
+  mergedMessages,
+} from '../services/delivery';
+import { errorMessage } from '../services/firebase';
+import { currentLocation } from '../services/location';
+import type { RootStackScreenProps } from '../navigation/types';
+import { colors } from '../theme/colors';
+type Entry = [string, Message];
+export function ChatDetailScreen({
+  route,
+  navigation,
+}: RootStackScreenProps<'ChatDetail'>) {
+  const { peerId, name } = route.params;
+  const { user } = useAuth();
+  const {
+    users,
+    presence,
+    chats,
+    error,
+    outbox,
+    connected,
+    send,
+    retry,
+    dismiss,
+  } = useChatData();
+  const uid = user!.uid;
+  const id = conversationId(uid, peerId);
+  const chat = chats[id];
+  const peerName = users[peerId]?.name || name;
+  const online = Object.values(presence[peerId] || {}).some(Boolean);
+  const messages = useMemo(
+    () => mergedMessages(chat, id, outbox),
+    [chat, id, outbox],
+  );
+  const peerRead = chat?.read?.[peerId];
+  const lastSeenOwn = messages
+    .filter(
+      ([key, m]) =>
+        m.senderId === uid &&
+        deliveryState(key, peerRead, outbox[key]) === 'seen',
+    )
+    .at(-1)?.[0];
+  const latestKey = messages.at(-1)?.[0];
+  const latestSender = messages.at(-1)?.[1].senderId;
+  const focused = useIsFocused();
+  const list = useRef<FlatList<Entry>>(null);
+  const [draft, setDraft] = useState('');
+  const [locating, setLocating] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [nearBottom, setNearBottom] = useState(true);
+  const bottomRef = useRef(true);
+  const initialScroll = useRef(false);
+  const [newCount, setNewCount] = useState(0);
+  const [visibleIncoming, setVisibleIncoming] = useState<string>();
+  const [active, setActive] = useState(AppState.currentState === 'active');
+  const [receiptError, setReceiptError] = useState('');
+  const scrollToBottom = useCallback((animated = true) => {
+    bottomRef.current = true;
+    setNearBottom(true);
+    setNewCount(0);
+    list.current?.scrollToEnd({ animated });
+  }, []);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s =>
+      setActive(s === 'active'),
+    );
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    if (!focused || !latestKey) {
+      return;
+    }
+    if (!initialScroll.current || bottomRef.current || latestSender === uid) {
+      const animate = initialScroll.current;
+      initialScroll.current = true;
+      const frame = requestAnimationFrame(() => scrollToBottom(animate));
+      return () => cancelAnimationFrame(frame);
+    }
+    setNewCount(n => n + 1);
+  }, [latestKey, latestSender, uid, focused, scrollToBottom]);
+  const ownRead = chat?.read?.[uid];
+  useEffect(() => {
+    if (
+      !focused ||
+      !active ||
+      !connected ||
+      !visibleIncoming ||
+      visibleIncoming <= (ownRead || '')
+    ) {
+      return;
+    }
+    let mounted = true;
+    markRead(id, uid, visibleIncoming)
+      .then(() => {
+        if (mounted) {
+          setReceiptError('');
+        }
+      })
+      .catch(e => {
+        if (mounted) {
+          setReceiptError(errorMessage(e));
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [focused, active, connected, visibleIncoming, ownRead, id, uid]);
+  const viewability = useRef({
+    itemVisiblePercentThreshold: 55,
+    minimumViewTime: 350,
+  }).current;
+  const onViewable = useCallback(
+    ({ viewableItems }: Parameters<NonNullable<FlatListProps<Entry>['onViewableItemsChanged']>>[0]) => {
+      const keys = viewableItems
+        .filter(v => v.isViewable && v.item[1].senderId !== uid)
+        .map(v => v.item[0])
+        .sort();
+      const key = keys.at(-1);
+      if (key) {
+        setVisibleIncoming(old => (!old || key > old ? key : old));
+      }
+    },
+    [uid],
+  );
+  function sendText() {
+    const text = draft.trim();
+    if (!text) {
+      return;
+    }
+    try {
+      send(peerId, { type: 'text', text });
+      setDraft('');
+      scrollToBottom();
+    } catch (e) {
+      Alert.alert('Không gửi được tin', errorMessage(e));
+    }
+  }
+  async function sendLocation() {
+    if (locating) {
+      return;
+    }
+    setLocating(true);
+    try {
+      const coords = await currentLocation();
+      send(peerId, {
+        type: 'location',
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      });
+      scrollToBottom();
+    } catch (e) {
+      Alert.alert('Gửi vị trí', errorMessage(e));
+    } finally {
+      setLocating(false);
+    }
+  }
+  function showDetails(key: string, m: Message) {
+    const mine = m.senderId === uid;
+    const state = deliveryState(key, peerRead, outbox[key]);
+    Alert.alert(
+      mine ? 'Thông tin tin nhắn' : peerName,
+      `${dateDivider(m.createdAt)} · ${timeLabel(m.createdAt)}${
+        mine ? `\n${deliveryLabels[state]}` : ''
+      }${outbox[key]?.error ? `\n${outbox[key].error}` : ''}`,
+      mine && state === 'failed'
+        ? [
+            { text: 'Đóng', style: 'cancel' },
+            { text: 'Gửi lại', onPress: () => retry(key) },
+          ]
+        : [{ text: 'Đóng' }],
+    );
+  }
+  return (
+    <SafeAreaView
+      edges={['top', 'bottom', 'left', 'right']}
+      style={styles.root}
+    >
+      <View style={styles.header}>
+        <Pressable
+          style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel="Quay lại danh sách chat"
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={26} color={colors.primary} />
+        </Pressable>
+        <Avatar name={peerName} size={42} online={online} />
+        <View style={styles.headerInfo}>
+          <Text style={styles.headerName} numberOfLines={1}>
+            {peerName}
+          </Text>
+          <Text style={styles.headerStatus}>
+            {online ? 'Đang hoạt động' : 'Hiện không hoạt động'}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Thông tin cuộc trò chuyện"
+          style={styles.iconButton}
+          onPress={() =>
+            Alert.alert(
+              peerName,
+              `${
+                online ? 'Đang hoạt động' : 'Hiện không hoạt động'
+              }\n\nBiểu tượng dấu tích: tin đã gửi. Avatar nhỏ: người nhận đã xem. Nhấn giữ tin nhắn để xem chi tiết.`,
+            )
+          }
+        >
+          <Ionicons
+            name="information-circle-outline"
+            size={25}
+            color={colors.primary}
+          />
+        </Pressable>
+      </View>
+      {(!connected || !!error || !!receiptError) && (
+        <View style={styles.notice}>
+          <Ionicons
+            name="cloud-offline-outline"
+            size={17}
+            color={colors.textMuted}
+          />
+          <Text style={styles.noticeText}>
+            {error ||
+              receiptError ||
+              'Đang kết nối lại. Tin đang gửi sẽ tiếp tục khi có mạng.'}
+          </Text>
+        </View>
+      )}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.flex}>
+          <FlatList
+            ref={list}
+            data={messages}
+            keyExtractor={([key]) => key}
+            style={styles.flex}
+            contentContainerStyle={styles.list}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            scrollEventThrottle={32}
+            onScroll={({
+              nativeEvent: { layoutMeasurement, contentOffset, contentSize },
+            }) => {
+              const bottom =
+                layoutMeasurement.height + contentOffset.y >=
+                contentSize.height - 90;
+              bottomRef.current = bottom;
+              setNearBottom(bottom);
+              if (bottom) {
+                setNewCount(0);
+              }
+            }}
+            onContentSizeChange={() => {
+              if (bottomRef.current) {
+                list.current?.scrollToEnd({ animated: false });
+              }
+            }}
+            onViewableItemsChanged={onViewable}
+            viewabilityConfig={viewability}
+            ListHeaderComponent={
+              <View style={styles.profile}>
+                <Avatar name={peerName} size={82} />
+                <Text style={styles.profileName}>{peerName}</Text>
+                <Text style={styles.profileSubtitle}>
+                  Các bạn đã kết nối trên chat
+                </Text>
+                <Text style={styles.profileHint}>
+                  Gửi lời chào để bắt đầu câu chuyện.
+                </Text>
+              </View>
+            }
+            renderItem={({ item: [key, m], index }) => {
+              const mine = m.senderId === uid;
+              const previous = messages[index - 1]?.[1];
+              const next = messages[index + 1]?.[1];
+              const newDay =
+                !previous ||
+                new Date(m.createdAt).toDateString() !==
+                  new Date(previous.createdAt).toDateString();
+              const newTime =
+                !previous || m.createdAt - previous.createdAt > 15 * 60 * 1000;
+              const grouped =
+                !!previous &&
+                previous.senderId === m.senderId &&
+                !newDay &&
+                m.createdAt - previous.createdAt < 2 * 60 * 1000;
+              const groupEnd =
+                !next ||
+                next.senderId !== m.senderId ||
+                next.createdAt - m.createdAt > 2 * 60 * 1000;
+              const state = deliveryState(key, peerRead, outbox[key]);
+              const failed = mine && state === 'failed';
+              const showStatus =
+                mine &&
+                (groupEnd ||
+                  state === 'sending' ||
+                  state === 'failed' ||
+                  key === lastSeenOwn ||
+                  selected === key);
+              return (
+                <View>
+                  {(newDay || newTime) && (
+                    <View style={styles.divider}>
+                      <Text style={styles.dividerText}>
+                        {newDay ? `${dateDivider(m.createdAt)} · ` : ''}
+                        {timeLabel(m.createdAt)}
+                      </Text>
+                    </View>
+                  )}
+                  <View
+                    style={[
+                      styles.messageRow,
+                      mine ? styles.outRow : styles.inRow,
+                      !grouped && styles.groupStart,
+                    ]}
+                  >
+                    {!mine && (
+                      <View style={styles.avatarSlot}>
+                        {groupEnd && <Avatar name={peerName} size={28} />}
+                      </View>
+                    )}
+                    <View
+                      style={[styles.messageColumn, mine && styles.ownColumn]}
+                    >
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${mine ? 'Bạn' : peerName}: ${
+                          m.type === 'location' ? 'Vị trí hiện tại' : m.text
+                        }`}
+                        onLongPress={() => showDetails(key, m)}
+                        onPress={() => {
+                          if (m.type === 'location') {
+                            Linking.openURL(
+                              `https://www.google.com/maps/search/?api=1&query=${m.latitude},${m.longitude}`,
+                            ).catch(() =>
+                              Alert.alert('Không mở được Google Maps'),
+                            );
+                          } else {
+                            setSelected(selected === key ? null : key);
+                          }
+                        }}
+                        style={[
+                          styles.bubble,
+                          mine ? styles.out : styles.in,
+                          grouped && (mine ? styles.joinOut : styles.joinIn),
+                          failed && styles.failedBubble,
+                          m.type === 'location' && styles.locationBubble,
+                        ]}
+                      >
+                        {m.type === 'location' ? (
+                          <View>
+                            <View style={styles.mapPreview}>
+                              <View style={styles.mapRoadOne} />
+                              <View style={styles.mapRoadTwo} />
+                              <View style={styles.mapPin}>
+                                <Ionicons
+                                  name="location"
+                                  size={28}
+                                  color={colors.primary}
+                                />
+                              </View>
+                            </View>
+                            <View style={styles.locationContent}>
+                              <Text style={styles.locationTitle}>
+                                Vị trí hiện tại
+                              </Text>
+                              <Text style={styles.coordinates}>
+                                {m.latitude?.toFixed(5)},{' '}
+                                {m.longitude?.toFixed(5)}
+                              </Text>
+                              <View style={styles.mapAction}>
+                                <Text style={styles.mapActionText}>
+                                  Mở Google Maps
+                                </Text>
+                                <Ionicons
+                                  name="open-outline"
+                                  size={15}
+                                  color={colors.primary}
+                                />
+                              </View>
+                            </View>
+                          </View>
+                        ) : (
+                          <Text
+                            selectable
+                            style={[
+                              styles.message,
+                              mine && styles.white,
+                              failed && styles.failedMessage,
+                            ]}
+                          >
+                            {m.text}
+                          </Text>
+                        )}
+                      </Pressable>
+                      <View
+                        style={[styles.messageMeta, mine && styles.metaRight]}
+                      >
+                        <Text style={styles.time}>
+                          {timeLabel(m.createdAt)}
+                        </Text>
+                        {showStatus && (
+                          <MessageStatus
+                            state={state}
+                            peerName={peerName}
+                            showAvatar={key === lastSeenOwn}
+                          />
+                        )}
+                      </View>
+                      {failed && (
+                        <View style={styles.retryRow}>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="Gửi lại tin nhắn thất bại"
+                            style={styles.retryButton}
+                            onPress={() => retry(key)}
+                          >
+                            <Ionicons
+                              name="refresh-outline"
+                              size={14}
+                              color={colors.danger}
+                            />
+                            <Text style={styles.retryText}>Thử gửi lại</Text>
+                          </Pressable>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="Bỏ tin nhắn thất bại"
+                            hitSlop={8}
+                            onPress={() => dismiss(key)}
+                          >
+                            <Ionicons
+                              name="close"
+                              size={17}
+                              color={colors.textMuted}
+                            />
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              );
+            }}
+          />
+          {!nearBottom && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cuộn đến tin mới nhất"
+              style={styles.jump}
+              onPress={() => scrollToBottom()}
+            >
+              <Ionicons name="arrow-down" size={18} color={colors.primary} />
+              {newCount > 0 && (
+                <Text style={styles.jumpText}>Tin nhắn mới</Text>
+              )}
+            </Pressable>
+          )}
+        </View>
+        <View style={styles.composer}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Gửi vị trí hiện tại"
+            accessibilityState={{ disabled: locating }}
+            disabled={locating}
+            style={styles.iconButton}
+            onPress={() => {
+              sendLocation();
+            }}
+          >
+            {locating ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Ionicons
+                name="location-outline"
+                size={27}
+                color={colors.primary}
+              />
+            )}
+          </Pressable>
+          <View style={styles.inputWrap}>
+            <TextInput
+              accessibilityLabel="Nội dung tin nhắn"
+              style={styles.input}
+              placeholder="Nhắn tin…"
+              placeholderTextColor={colors.textMuted}
+              value={draft}
+              onChangeText={setDraft}
+              maxLength={4000}
+              multiline
+              onFocus={() => {
+                if (bottomRef.current) {
+                  requestAnimationFrame(() => scrollToBottom());
+                }
+              }}
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Gửi tin nhắn"
+            accessibilityState={{ disabled: !draft.trim() }}
+            disabled={!draft.trim()}
+            style={[styles.send, !draft.trim() && styles.sendDisabled]}
+            onPress={sendText}
+          >
+            <Ionicons
+              name="send"
+              size={23}
+              color={draft.trim() ? 'white' : colors.textMuted}
+            />
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#0C1322',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  iconButton: {
+    minWidth: 40,
+    minHeight: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerInfo: { flex: 1, marginLeft: 4, gap: 2 },
+  headerName: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
+  headerStatus: { fontSize: 12, color: '#00F0FF', fontWeight: '500' },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    backgroundColor: '#111827',
+  },
+  noticeText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    flex: 1,
+    lineHeight: 18,
+  },
+  list: { paddingHorizontal: 14, paddingBottom: 16 },
+  profile: { alignItems: 'center', paddingTop: 28, paddingBottom: 22, gap: 8 },
+  profileName: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginTop: 6,
+  },
+  profileSubtitle: { fontSize: 13, color: '#94A3B8' },
+  profileHint: { fontSize: 12, color: '#64748B' },
+  divider: { alignItems: 'center', paddingTop: 14, paddingBottom: 16 },
+  dividerText: { fontSize: 11, fontWeight: '700', color: '#64748B', letterSpacing: 0.5 },
+  messageRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 4 },
+  outRow: { justifyContent: 'flex-end', paddingLeft: 44 },
+  inRow: { justifyContent: 'flex-start', paddingRight: 36 },
+  groupStart: { marginTop: 10 },
+  avatarSlot: { width: 34, paddingBottom: 22, alignItems: 'flex-start' },
+  messageColumn: { maxWidth: '88%', alignItems: 'flex-start' },
+  ownColumn: { alignItems: 'flex-end' },
+  bubble: {
+    borderRadius: 18,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    minWidth: 40,
+    elevation: 2,
+  },
+  out: {
+    backgroundColor: '#0077CC',
+    borderBottomRightRadius: 4,
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+  },
+  in: {
+    backgroundColor: '#131D2E',
+    borderBottomLeftRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#1E2F4D',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  joinOut: { borderTopRightRadius: 4 },
+  joinIn: { borderTopLeftRadius: 4 },
+  message: { fontSize: 15, lineHeight: 22, color: '#F8FAFC' },
+  white: { color: '#FFFFFF' },
+  failedBubble: {
+    backgroundColor: 'rgba(255, 0, 85, 0.15)',
+    borderWidth: 1,
+    borderColor: '#FF0055',
+  },
+  failedMessage: { color: '#FF4D88' },
+  messageMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 4,
+    marginBottom: 3,
+    paddingHorizontal: 4,
+    minHeight: 18,
+  },
+  metaRight: { justifyContent: 'flex-end', flexWrap: 'wrap' },
+  time: { fontSize: 10, color: '#64748B' },
+  retryRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: 44,
+  },
+  retryText: { fontSize: 12, fontWeight: '700', color: colors.danger },
+  locationBubble: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    overflow: 'hidden',
+    backgroundColor: '#111827',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    borderRadius: 20,
+    width: 240,
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  mapPreview: {
+    height: 96,
+    backgroundColor: '#091422',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  mapRoadOne: {
+    position: 'absolute',
+    height: 12,
+    width: 300,
+    backgroundColor: '#1E293B',
+    transform: [{ rotate: '-24deg' }],
+  },
+  mapRoadTwo: {
+    position: 'absolute',
+    height: 150,
+    width: 10,
+    backgroundColor: '#1E293B',
+    transform: [{ rotate: '-28deg' }],
+  },
+  mapPin: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0F1A2E',
+    borderWidth: 1.5,
+    borderColor: '#00F0FF',
+    elevation: 4,
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+  },
+  locationContent: { padding: 14, gap: 5 },
+  locationTitle: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
+  coordinates: { fontSize: 12, color: '#94A3B8' },
+  mapAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  mapActionText: { fontSize: 13, fontWeight: '800', color: '#00F0FF' },
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderTopColor: '#1E293B',
+    borderTopWidth: 1,
+    backgroundColor: '#0C1322',
+  },
+  inputWrap: {
+    flex: 1,
+    backgroundColor: '#080D18',
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    minHeight: 44,
+    maxHeight: 132,
+  },
+  input: {
+    fontSize: 15,
+    lineHeight: 21,
+    paddingHorizontal: 16,
+    paddingTop: 11,
+    paddingBottom: 11,
+    color: '#FFFFFF',
+    maxHeight: 132,
+  },
+  send: {
+    height: 42,
+    width: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    marginLeft: 2,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sendDisabled: { backgroundColor: '#1E293B', elevation: 0, shadowOpacity: 0 },
+  jump: {
+    position: 'absolute',
+    bottom: 16,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#111827',
+    borderWidth: 1.5,
+    borderColor: '#00F0FF',
+    borderRadius: 24,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    elevation: 6,
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+  },
+  jumpText: { fontSize: 13, fontWeight: '800', color: '#00F0FF' },
+});
