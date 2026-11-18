@@ -1,4 +1,4 @@
-﻿jest.mock('firebase/database', () => ({}));
+jest.mock('firebase/database', () => ({}));
 jest.mock('../src/services/firebase', () => ({ db: jest.fn() }));
 import {
   conversationId,
@@ -36,6 +36,10 @@ test('orders message snapshots and previews a location', () => {
     '002',
     '003',
   ]);
-  expect(preview(chat.messages!['003'])).toBe('Vị trí');
+  expect(preview(chat.messages!['003'])).toBe('📍 Vị trí');
+  expect(preview({ type: 'image' })).toBe('📷 Hình ảnh');
+  expect(preview({ type: 'text', text: 'abc', recalled: true })).toBe(
+    'Tin nhắn đã được thu hồi',
+  );
   expect(messageEntries()).toEqual([]);
 });

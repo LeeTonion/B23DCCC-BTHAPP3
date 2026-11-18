@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 
 const palette = [
@@ -13,12 +13,19 @@ const palette = [
 
 interface Props {
   name: string;
+  avatarUrl?: string;
   size?: number;
   online?: boolean;
   label?: string;
 }
 
-export function Avatar({ name, size = 48, online = false, label }: Props) {
+export function Avatar({
+  name,
+  avatarUrl,
+  size = 48,
+  online = false,
+  label,
+}: Props) {
   const words = name.trim().split(/\s+/).filter(Boolean);
   const letters = (
     words.length > 1
@@ -44,20 +51,28 @@ export function Avatar({ name, size = 48, online = false, label }: Props) {
             backgroundColor: tint.bg,
             borderColor: tint.ring,
             borderWidth: 1.5,
+            overflow: 'hidden',
           },
         ]}
       >
-        <Text
-          style={[
-            styles.letters,
-            {
-              fontSize: size * (letters.length > 1 ? 0.34 : 0.42),
-              color: tint.ink,
-            },
-          ]}
-        >
-          {letters}
-        </Text>
+        {avatarUrl ? (
+          <Image
+            source={{ uri: avatarUrl }}
+            style={{ width: size, height: size }}
+          />
+        ) : (
+          <Text
+            style={[
+              styles.letters,
+              {
+                fontSize: size * (letters.length > 1 ? 0.34 : 0.42),
+                color: tint.ink,
+              },
+            ]}
+          >
+            {letters}
+          </Text>
+        )}
       </View>
       {online && (
         <View

@@ -1,32 +1,41 @@
-﻿import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons/static';
 import { Avatar } from './Avatar';
+import { timeLabel } from '../services/chat';
 import { deliveryLabels, type DeliveryState } from '../services/delivery';
 import { colors } from '../theme/colors';
+
 interface Props {
   state: DeliveryState;
   peerName: string;
+  peerAvatarUrl?: string;
+  seenAt?: number;
   compact?: boolean;
   showAvatar?: boolean;
 }
+
 export function MessageStatus({
   state,
   peerName,
+  peerAvatarUrl,
+  seenAt,
   compact = false,
   showAvatar = true,
 }: Props) {
   const color = state === 'failed' ? colors.danger : colors.textMuted;
+  const labelText =
+    state === 'seen' && seenAt
+      ? `Đã xem · ${timeLabel(seenAt)}`
+      : deliveryLabels[state];
+
   return (
-    <View
-      accessible
-      accessibilityLabel={deliveryLabels[state]}
-      style={styles.row}
-    >
+    <View accessible accessibilityLabel={labelText} style={styles.row}>
       {state === 'sending' ? (
         <ActivityIndicator size="small" color={color} />
       ) : state === 'seen' && showAvatar ? (
         <Avatar
           name={peerName}
+          avatarUrl={peerAvatarUrl}
           size={compact ? 19 : 17}
           label={`${peerName} đã xem`}
         />
@@ -43,12 +52,11 @@ export function MessageStatus({
           color={state === 'seen' ? colors.primary : color}
         />
       )}
-      {!compact && (
-        <Text style={[styles.label, { color }]}>{deliveryLabels[state]}</Text>
-      )}
+      {!compact && <Text style={[styles.label, { color }]}>{labelText}</Text>}
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',

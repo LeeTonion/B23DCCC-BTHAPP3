@@ -12,69 +12,151 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@react-native-vector-icons/ionicons/static';
 import { Avatar } from '../components/Avatar';
-import { MessageStatus } from '../components/MessageStatus';
 import { useAuth } from '../context/AuthContext';
 import { useChatData } from '../context/ChatContext';
-import { conversationId, unreadCount } from '../services/chat';
-import {
-  deliveryState,
-  lastMessageText,
-  listTime,
-  mergedMessages,
-} from '../services/delivery';
+import { conversationId } from '../services/chat';
+import { listTime } from '../services/delivery';
 import type { MainTabScreenProps } from '../navigation/types';
 import { colors } from '../theme/colors';
+
+interface RowItem {
+  key: string;
+  convId: string;
+  peerId?: string;
+  name: string;
+  avatarUrl?: string;
+  isGroup: boolean;
+  online: boolean;
+  lastMessage: string;
+  lastSenderId?: string;
+  updatedAt: number;
+  unread: number;
+}
+
 export function ChatListScreen({
   navigation,
   route,
 }: MainTabScreenProps<'Chats'> | MainTabScreenProps<'Contacts'>) {
   const contacts = route.name === 'Contacts';
   const { user, presenceError } = useAuth();
-  const { users, presence, chats, error, loading, outbox, connected } =
-    useChatData();
+  const {
+    users,
+    presence,
+    chats,
+    userChats,
+    error,
+    loading,
+    connected,
+  } = useChatData();
   const [search, setSearch] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
+
   const uid = user!.uid;
-  const ownName = users[uid]?.name || user?.displayName || 'Bạn';
-  const allRows = useMemo(
-    () =>
-      Object.entries(users)
-        .filter(([key]) => key !== uid)
-        .map(([key, p]) => {
-          const id = conversationId(uid, key);
-          const chat = chats[id];
-          const last = mergedMessages(chat, id, outbox).at(-1);
-          return {
-            uid: key,
-            id,
-            name: p.name,
-            online: Object.values(presence[key] || {}).some(Boolean),
-            chat,
-            last,
-            unread: chat ? unreadCount(chat, uid) : 0,
-          };
-        }),
-    [users, uid, chats, outbox, presence],
-  );
-  const rows = allRows
-    .filter(
-      r =>
-        r.name
-          .toLocaleLowerCase('vi')
-          .includes(search.trim().toLocaleLowerCase('vi')) &&
-        (contacts || r.last) &&
-        (!unreadOnly || contacts || r.unread > 0),
-    )
-    .sort((a, b) =>
-      contacts
-        ? a.name.localeCompare(b.name, 'vi')
-        : (b.last?.[1].createdAt || 0) - (a.last?.[1].createdAt || 0),
-    );
-  const activePeople = allRows.filter(r => r.online);
-  const unreadTotal = allRows.reduce((total, r) => total + r.unread, 0);
-  function open(peerId: string, name: string) {
-    navigation.navigate('ChatDetail', { peerId, name });
+  const ownProfile = users[uid];
+  const ownName = ownProfile?.name || user?.displayName || 'Bạn';
+
+  const contactRows = useMemo<RowItem[]>(() => {
+    return Object.entries(users)
+      .filter(([key]) => key !== uid)
+      .map(([key, p]) => ({
+        key,
+        convId: conversationId(uid, key),
+        peerId: key,
+        name: p.name,
+        avatarUrl: p.avatarUrl,
+        isGroup: false,
+        online: Object.values(presence[key] || {}).some(Boolean),
+        lastMessage: '',
+        updatedAt: 0,
+        unread: 0,
+      }));
+  }, [users, uid, presence]);
+
+  const chatRows = useMemo<RowItem[]>(() => {
+    return Object.entries(userChats).map(([convId, uc]) => {
+      const conv = chats[convId];
+      const isGroup = conv?.type === 'group';
+      if (isGroup) {
+        const memberIds = Object.keys(conv?.members || {}).filter(
+          id => id !== uid,
+        );
+        const online = memberIds.some(id =>
+          Object.values(presence[id] || {}).some(Boolean),
+        );
+        return {
+          key: convId,
+          convId,
+          name: conv?.name || 'Nhóm chat',
+          isGroup: true,
+          online,
+          lastMessage: uc.lastMessage || '',
+          lastSenderId: uc.lastSenderId,
+          updatedAt: uc.updatedAt || 0,
+          unread: uc.unread || 0,
+        };
+      }
+      const peerId =
+        Object.keys(conv?.members || {}).find(id => id !== uid) ||
+        convId.split('_').find(id => id !== uid) ||
+        '';
+      const peer = users[peerId];
+      return {
+        key: convId,
+        convId,
+        peerId,
+        name: peer?.name || 'Người dùng',
+        avatarUrl: peer?.avatarUrl,
+        isGroup: false,
+        online: Object.values(presence[peerId] || {}).some(Boolean),
+        lastMessage: uc.lastMessage || '',
+        lastSenderId: uc.lastSenderId,
+        updatedAt: uc.updatedAt || 0,
+        unread: uc.unread || 0,
+      };
+    });
+  }, [userChats, chats, uid, users, presence]);
+
+  const rows = useMemo(() => {
+    const q = search.trim().toLocaleLowerCase('vi');
+    if (contacts) {
+      return contactRows
+        .filter(r => r.name.toLocaleLowerCase('vi').includes(q))
+        .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    }
+    return chatRows
+      .filter(
+        r =>
+          r.name.toLocaleLowerCase('vi').includes(q) &&
+          (!unreadOnly || r.unread > 0),
+      )
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [contacts, contactRows, chatRows, search, unreadOnly]);
+
+  const activePeople = contactRows.filter(r => r.online);
+  const unreadTotal = chatRows.reduce((total, r) => total + r.unread, 0);
+
+  function open(item: RowItem) {
+    navigation.navigate('ChatDetail', {
+      convId: item.convId,
+      peerId: item.peerId,
+      name: item.name,
+      isGroup: item.isGroup,
+    });
   }
+
+  function formatPreview(item: RowItem) {
+    if (!item.lastMessage) {
+      return '';
+    }
+    if (item.lastSenderId === uid) {
+      return `Bạn: ${item.lastMessage}`;
+    }
+    if (item.isGroup && item.lastSenderId && users[item.lastSenderId]?.name) {
+      return `${users[item.lastSenderId].name}: ${item.lastMessage}`;
+    }
+    return item.lastMessage;
+  }
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
       <View style={styles.header}>
@@ -83,9 +165,21 @@ export function ChatListScreen({
           accessibilityLabel="Mở cài đặt tài khoản"
           onPress={() => navigation.navigate('Settings')}
         >
-          <Avatar name={ownName} size={40} />
+          <Avatar
+            name={ownName}
+            avatarUrl={ownProfile?.avatarUrl}
+            size={40}
+          />
         </Pressable>
         <Text style={styles.heading}>{contacts ? 'Danh bạ' : 'Đoạn chat'}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Tạo nhóm mới"
+          style={styles.headerAction}
+          onPress={() => navigation.navigate('CreateGroup')}
+        >
+          <Ionicons name="people-outline" size={22} color={colors.primary} />
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
@@ -101,9 +195,10 @@ export function ChatListScreen({
           />
         </Pressable>
       </View>
+
       <FlatList
         data={rows}
-        keyExtractor={r => r.uid}
+        keyExtractor={r => r.key}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.list}
         ListHeaderComponent={
@@ -111,9 +206,9 @@ export function ChatListScreen({
             <View style={styles.searchBar}>
               <Ionicons name="search" size={21} color={colors.textMuted} />
               <TextInput
-                accessibilityLabel="Tìm kiếm người dùng"
+                accessibilityLabel="Tìm kiếm"
                 style={styles.searchInput}
-                placeholder={contacts ? 'Tìm bạn bè' : 'Tìm kiếm'}
+                placeholder={contacts ? 'Tìm bạn bè' : 'Tìm kiếm cuộc trò chuyện'}
                 placeholderTextColor={colors.textMuted}
                 value={search}
                 onChangeText={setSearch}
@@ -160,13 +255,18 @@ export function ChatListScreen({
                 >
                   {activePeople.map(person => (
                     <Pressable
-                      key={person.uid}
+                      key={person.key}
                       style={styles.person}
                       accessibilityRole="button"
                       accessibilityLabel={`Nhắn tin với ${person.name}`}
-                      onPress={() => open(person.uid, person.name)}
+                      onPress={() => open(person)}
                     >
-                      <Avatar name={person.name} size={60} online />
+                      <Avatar
+                        name={person.name}
+                        avatarUrl={person.avatarUrl}
+                        size={60}
+                        online
+                      />
                       <Text numberOfLines={1} style={styles.personName}>
                         {person.name}
                       </Text>
@@ -178,7 +278,7 @@ export function ChatListScreen({
             {contacts ? (
               <View style={styles.sectionHeading}>
                 <Text style={styles.sectionLabel}>MỌI NGƯỜI</Text>
-                <Text style={styles.count}>{allRows.length} người bạn</Text>
+                <Text style={styles.count}>{contactRows.length} người bạn</Text>
               </View>
             ) : (
               <View style={styles.filters}>
@@ -233,7 +333,7 @@ export function ChatListScreen({
               </View>
               <Text style={styles.emptyTitle}>
                 {search
-                  ? 'Không tìm thấy người dùng'
+                  ? 'Không tìm thấy kết quả'
                   : unreadOnly && !contacts
                   ? 'Bạn đã đọc hết tin nhắn'
                   : contacts
@@ -245,7 +345,7 @@ export function ChatListScreen({
                   ? 'Thử tìm bằng một tên khác.'
                   : contacts
                   ? 'Đăng ký một tài khoản khác trên thiết bị thứ hai để kết nối.'
-                  : 'Chọn một người trong danh bạ và gửi lời chào.'}
+                  : 'Chọn một người trong danh bạ hoặc tạo nhóm chat mới.'}
               </Text>
               {!contacts && !unreadOnly && !search && (
                 <Pressable
@@ -264,98 +364,82 @@ export function ChatListScreen({
             </View>
           )
         }
-        renderItem={({ item }) => {
-          const last = item.last?.[1];
-          const key = item.last?.[0];
-          const outgoing = !!last && last.senderId === uid;
-          const state = key
-            ? deliveryState(key, item.chat?.read?.[item.uid], outbox[key])
-            : 'sent';
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${item.name}, ${
-                item.unread
-                  ? `${item.unread} tin chưa đọc`
-                  : contacts
-                  ? item.online
-                    ? 'Đang hoạt động'
-                    : 'Không hoạt động'
-                  : last
-                  ? lastMessageText(last, uid, item.name)
-                  : ''
-              }`}
-              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-              onPress={() => open(item.uid, item.name)}
-            >
-              <Avatar name={item.name} size={64} online={item.online} />
-              <View style={styles.info}>
-                <View style={styles.line}>
+        renderItem={({ item }) => (
+          <Pressable
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+            onPress={() => open(item)}
+          >
+            <Avatar
+              name={item.name}
+              avatarUrl={item.avatarUrl}
+              size={60}
+              online={item.online}
+            />
+            <View style={styles.info}>
+              <View style={styles.line}>
+                <View style={styles.titleWrap}>
+                  {item.isGroup && (
+                    <Ionicons
+                      name="people"
+                      size={15}
+                      color={colors.primary}
+                      style={{ marginRight: 4 }}
+                    />
+                  )}
                   <Text
                     numberOfLines={1}
                     style={[styles.name, item.unread > 0 && styles.unreadName]}
                   >
                     {item.name}
                   </Text>
-                  {!contacts && last && (
-                    <Text
-                      style={[
-                        styles.time,
-                        item.unread > 0 && styles.unreadText,
-                      ]}
-                    >
-                      {listTime(last.createdAt)}
-                    </Text>
-                  )}
                 </View>
-                <View style={styles.previewLine}>
+                {!contacts && item.updatedAt > 0 && (
                   <Text
-                    numberOfLines={1}
                     style={[
-                      styles.preview,
+                      styles.time,
                       item.unread > 0 && styles.unreadText,
-                      state === 'failed' && outgoing && styles.failed,
                     ]}
                   >
-                    {contacts
-                      ? item.online
-                        ? 'Đang hoạt động'
-                        : 'Không hoạt động'
-                      : last
-                      ? state === 'failed' && outgoing
-                        ? 'Bạn: Gửi thất bại — nhấn để thử lại'
-                        : lastMessageText(last, uid, item.name)
-                      : ''}
+                    {listTime(item.updatedAt)}
                   </Text>
-                  {!contacts &&
-                    (item.unread > 0 ? (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>
-                          {item.unread > 99 ? '99+' : item.unread}
-                        </Text>
-                      </View>
-                    ) : outgoing ? (
-                      <MessageStatus
-                        state={state}
-                        peerName={item.name}
-                        compact
-                      />
-                    ) : null)}
-                </View>
+                )}
               </View>
-            </Pressable>
-          );
-        }}
+              <View style={styles.previewLine}>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.preview,
+                    item.unread > 0 && styles.unreadText,
+                  ]}
+                >
+                  {contacts
+                    ? item.online
+                      ? 'Đang hoạt động'
+                      : 'Không hoạt động'
+                    : formatPreview(item)}
+                </Text>
+                {!contacts && item.unread > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {item.unread > 99 ? '99+' : item.unread}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </Pressable>
+        )}
       />
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 10,
     paddingHorizontal: 20,
     paddingTop: 14,
     paddingBottom: 14,
@@ -368,9 +452,9 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   headerAction: {
-    height: 42,
-    width: 42,
-    borderRadius: 21,
+    height: 40,
+    width: 40,
+    borderRadius: 20,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.border,
@@ -395,11 +479,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     minHeight: 46,
     gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
   },
   searchInput: {
     flex: 1,
@@ -425,10 +504,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     lineHeight: 18,
   },
-  activeSection: {
-    paddingTop: 6,
-    marginBottom: 6,
-  },
+  activeSection: { paddingTop: 6, marginBottom: 6 },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
@@ -439,7 +515,13 @@ const styles = StyleSheet.create({
   },
   people: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12, gap: 12 },
   person: { width: 72, alignItems: 'center', gap: 6 },
-  personName: { fontSize: 12, color: colors.text, maxWidth: 72, textAlign: 'center', fontWeight: '500' },
+  personName: {
+    fontSize: 12,
+    color: colors.text,
+    maxWidth: 72,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
   filters: {
     flexDirection: 'row',
     gap: 8,
@@ -469,30 +551,32 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 8,
   },
-  count: { marginRight: 18, color: colors.textMuted, fontSize: 12, fontWeight: '600' },
+  count: {
+    marginRight: 18,
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 14,
-    minHeight: 80,
+    minHeight: 78,
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
     marginVertical: 4,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
     elevation: 1,
   },
   pressed: { backgroundColor: colors.softBlue, opacity: 0.9 },
   info: { flex: 1, gap: 5 },
   line: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  name: { fontSize: 16, fontWeight: '600', color: colors.text, flex: 1 },
+  titleWrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  name: { fontSize: 16, fontWeight: '600', color: colors.text, flexShrink: 1 },
   unreadName: { fontWeight: '800', color: colors.text },
   time: { fontSize: 11, color: colors.textMuted, fontWeight: '500' },
   previewLine: {
@@ -501,7 +585,12 @@ const styles = StyleSheet.create({
     gap: 10,
     minHeight: 20,
   },
-  preview: { flex: 1, fontSize: 13.5, color: colors.textMuted, lineHeight: 19 },
+  preview: {
+    flex: 1,
+    fontSize: 13.5,
+    color: colors.textMuted,
+    lineHeight: 19,
+  },
   unreadText: { fontWeight: '700', color: colors.text },
   badge: {
     minWidth: 22,
@@ -511,14 +600,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
   },
   badgeText: { fontSize: 11, color: '#FFFFFF', fontWeight: '800' },
-  failed: { color: colors.danger },
   empty: { padding: 36, paddingTop: 64, alignItems: 'center', gap: 12 },
   emptyIcon: {
     height: 76,

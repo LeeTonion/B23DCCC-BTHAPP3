@@ -1,4 +1,4 @@
-﻿import {
+import {
   deliveryState,
   lastMessageText,
   mergedMessages,
@@ -53,5 +53,11 @@ test('last-message previews distinguish yourself and the contact for text and lo
   ).toBe('Lan: Chào bạn');
   expect(
     lastMessageText({ ...outgoing.message, type: 'location' }, 'a', 'Lan'),
-  ).toBe('Bạn: Đã gửi một vị trí');
+  ).toBe('Bạn: 📍 Vị trí');
+  expect(
+    lastMessageText({ ...outgoing.message, type: 'image' }, 'a', 'Lan'),
+  ).toBe('Bạn: 📷 Hình ảnh');
+  expect(
+    lastMessageText({ ...outgoing.message, recalled: true }, 'a', 'Lan'),
+  ).toBe('Bạn: Tin nhắn đã được thu hồi');
 });

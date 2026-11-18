@@ -1,10 +1,9 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@react-native-vector-icons/ionicons/static';
 import { ChatListScreen } from '../screens/ChatListScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { useChatData } from '../context/ChatContext';
-import { useAuth } from '../context/AuthContext';
-import { unreadCount } from '../services/chat';
 import { colors } from '../theme/colors';
 import type { MainTabParamList } from './types';
 
@@ -26,6 +25,14 @@ const contactIcon = ({ color, focused }: { color: string; focused: boolean }) =>
   />
 );
 
+const notifIcon = ({ color, focused }: { color: string; focused: boolean }) => (
+  <Ionicons
+    name={focused ? 'notifications' : 'notifications-outline'}
+    size={24}
+    color={color}
+  />
+);
+
 const settingsIcon = ({ color, focused }: { color: string; focused: boolean }) => (
   <Ionicons
     name={focused ? 'settings' : 'settings-outline'}
@@ -35,12 +42,12 @@ const settingsIcon = ({ color, focused }: { color: string; focused: boolean }) =
 );
 
 export function MainTabs() {
-  const { chats } = useChatData();
-  const { user } = useAuth();
-  const unread = Object.values(chats).reduce(
-    (n, c) => n + unreadCount(c, user!.uid),
+  const { userChats, notifications } = useChatData();
+  const unread = Object.values(userChats).reduce(
+    (n, c) => n + (c.unread || 0),
     0,
   );
+  const unreadNotifs = Object.values(notifications).filter(n => !n.read).length;
 
   return (
     <Tab.Navigator
@@ -89,6 +96,21 @@ export function MainTabs() {
           title: 'Danh bạ',
           headerShown: false,
           tabBarIcon: contactIcon,
+        }}
+      />
+      <Tab.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          title: 'Thông báo',
+          headerShown: false,
+          tabBarBadge: unreadNotifs || undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.danger,
+            fontSize: 11,
+            fontWeight: '700',
+          },
+          tabBarIcon: notifIcon,
         }}
       />
       <Tab.Screen

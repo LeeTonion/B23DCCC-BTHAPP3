@@ -11,6 +11,16 @@
 5. Realtime Database → Rules: dán nội dung [database.rules.json](database.rules.json), nhấn **Publish**. Hoặc dùng Firebase CLI: `firebase login`, `firebase use --add`, `firebase deploy --only database`.
 6. Không có tệp luật của giảng viên trong thư mục được cung cấp. Luật kèm dự án là bộ luật dành cho cấu trúc dữ liệu hiện tại; nếu có luật bắt buộc khác, cần đối chiếu schema trước khi thay.
 
+## 1b. Cấu hình Cloudinary (gửi ảnh và đổi ảnh đại diện)
+
+1. Đăng nhập https://cloudinary.com (tài khoản Free).
+2. Tại trang **Dashboard**, sao chép **Cloud name** (ví dụ `y2zthuxa`).
+3. Vào **Settings (⚙️) → Upload → Upload presets → Add upload preset**:
+   - Đổi **Signing mode** từ `Signed` sang **`Unsigned`**.
+   - Lưu lại và sao chép **Upload preset name**.
+4. Sao chép [cloudinaryConfig.example.ts](src/services/cloudinaryConfig.example.ts) thành `src/services/cloudinaryConfig.ts` (PowerShell: `Copy-Item src/services/cloudinaryConfig.example.ts src/services/cloudinaryConfig.ts`).
+5. Điền `cloudName` và `uploadPreset` vào `src/services/cloudinaryConfig.ts`. **Tuyệt đối không** đưa API Secret của Cloudinary vào mã nguồn ứng dụng.
+
 Không mở `.read`/`.write` công khai. Người dùng đã đăng nhập đọc danh bạ và trạng thái; chỉ thành viên đọc cuộc trò chuyện, người gửi tạo tin của mình, chủ tài khoản cập nhật mốc đã đọc. Tin nhắn đã ghi không được sửa/xóa qua client. Hồ sơ công khai chỉ có tên, không chứa email/mật khẩu.
 
 Truy vấn Home dùng hai trường cố định `userA`, `userB` với `equalTo(uid)`. Rules đã khai báo index cho cả hai trường. Mỗi hội thoại mới ghi metadata và members nguyên tử; hai listener được hợp nhất và cùng hủy khi cleanup. Nếu có dữ liệu từ phiên bản cũ chưa có userA/userB, cần bổ sung hai trường theo UID thành viên (sắp xếp tăng dần) bằng Firebase Console trước khi hiển thị trên Home.
@@ -79,8 +89,8 @@ Xem [hướng dẫn nộp bài](docs/NOP_BAI.md) cho ảnh và video cần tự 
 
 ## Cấu hình local và Git
 
-- Cấu hình thật trong `src/services/firebaseConfig.ts` chỉ nằm trên máy bạn và được `.gitignore` bỏ qua. Repository giữ `src/services/firebaseConfig.example.ts` với các giá trị rỗng.
-- Khi clone dự án, sao chép tệp mẫu thành tệp cấu hình thật rồi nhập thông tin project của bạn. Không ghi đè cấu hình local đang dùng.
+- Cấu hình thật trong `src/services/firebaseConfig.ts` và `src/services/cloudinaryConfig.ts` chỉ nằm trên máy bạn và được `.gitignore` bỏ qua. Repository giữ `src/services/firebaseConfig.example.ts` và `src/services/cloudinaryConfig.example.ts` với các giá trị rỗng.
+- Khi clone dự án, sao chép hai tệp mẫu thành tệp cấu hình thật rồi nhập thông tin project của bạn. Không ghi đè cấu hình local đang dùng.
 - `.env`, cấu hình Firebase native, service-account JSON, private key, thư mục credentials/secrets và log/cache Firebase được bỏ qua. Các tệp `firebase.json` và `database.rules.json` vẫn được quản lý bằng Git để triển khai cấu hình và luật truy cập.
 - Firebase Web API key là cấu hình client, không phải private key và vẫn có trong ứng dụng sau khi build. Bảo vệ dữ liệu bằng Authentication và Database Rules. Không đưa Admin SDK/service account vào ứng dụng.
 - `.gitignore` không xóa dữ liệu đã commit trước đó. Nếu private key/service account từng được công khai, cần thu hồi/đổi khóa đó.

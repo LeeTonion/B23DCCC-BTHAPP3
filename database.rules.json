@@ -1,4 +1,4 @@
-﻿{
+{
   "rules": {
     ".read": false,
     ".write": false,
@@ -9,6 +9,12 @@
         ".validate": "newData.hasChildren(['name'])",
         "name": {
           ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+        },
+        "avatarUrl": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 1000"
+        },
+        "lastSeen": {
+          ".validate": "newData.isNumber()"
         },
         "$other": { ".validate": false }
       }
@@ -22,55 +28,87 @@
         }
       }
     },
+    "activeChat": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.isString()"
+      }
+    },
     "conversations": {
-      ".read": "auth != null && ((query.orderByChild === 'userA' && query.equalTo === auth.uid) || (query.orderByChild === 'userB' && query.equalTo === auth.uid))",
-      ".indexOn": ["userA", "userB"],
-      "$id": {
+      "$convId": {
         ".read": "auth != null && data.child('members').child(auth.uid).val() === true",
-        ".validate": "newData.hasChildren(['userA', 'userB', 'members']) && newData.child('userA').isString() && newData.child('userB').isString() && newData.child('userA').val() < newData.child('userB').val() && $id === newData.child('userA').val() + '_' + newData.child('userB').val()",
-        "userA": {
-          ".write": "auth != null && newData.parent().child('members').child(auth.uid).val() === true && (!data.exists() || newData.val() === data.val())",
-          ".validate": "newData.isString() && root.child('users').child(newData.val()).exists()"
+        ".write": "auth != null && (newData.child('members').child(auth.uid).val() === true || data.child('members').child(auth.uid).val() === true)",
+        "type": {
+          ".validate": "newData.val() === 'direct' || newData.val() === 'group'"
         },
-        "userB": {
-          ".write": "auth != null && newData.parent().child('members').child(auth.uid).val() === true && (!data.exists() || newData.val() === data.val())",
-          ".validate": "newData.isString() && root.child('users').child(newData.val()).exists()"
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
         },
         "members": {
-          ".write": "auth != null && newData.child(auth.uid).val() === true && (!data.exists() || data.child(auth.uid).val() === true)",
-          ".validate": "newData.hasChildren([newData.parent().child('userA').val(), newData.parent().child('userB').val()])",
           "$uid": {
-            ".validate": "newData.val() === true && ($uid === newData.parent().parent().child('userA').val() || $uid === newData.parent().parent().child('userB').val())"
+            ".validate": "newData.val() === true && root.child('users').child($uid).exists()"
           }
         },
-        "messages": {
-          "$message": {
-            ".write": "auth != null && root.child('conversations').child($id).child('members').child(auth.uid).val() === true && !data.exists() && newData.exists()",
-            ".validate": "newData.hasChildren(['senderId','type','createdAt']) && ((newData.child('type').val() === 'text' && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 4000 && !newData.hasChild('latitude') && !newData.hasChild('longitude')) || (newData.child('type').val() === 'location' && newData.hasChildren(['latitude','longitude']) && !newData.hasChild('text')))",
-            "senderId": { ".validate": "newData.val() === auth.uid" },
-            "type": {
-              ".validate": "newData.val() === 'text' || newData.val() === 'location'"
-            },
-            "createdAt": {
-              ".validate": "newData.isNumber() && newData.val() === now"
-            },
-            "text": { ".validate": "newData.isString()" },
-            "latitude": {
-              ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
-            },
-            "longitude": {
-              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
-            },
-            "$other": { ".validate": false }
-          }
+        "createdBy": {
+          ".validate": "newData.isString()"
         },
-        "read": {
-          "$uid": {
-            ".write": "auth != null && auth.uid === $uid && root.child('conversations').child($id).child('members').child(auth.uid).val() === true",
-            ".validate": "newData.isString() && root.child('conversations').child($id).child('messages').child(newData.val()).exists() && (!data.exists() || newData.val() >= data.val())"
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+    "messages": {
+      "$convId": {
+        ".read": "auth != null && root.child('conversations').child($convId).child('members').child(auth.uid).val() === true",
+        "$msgId": {
+          ".write": "auth != null && (root.child('conversations').child($convId).child('members').child(auth.uid).val() === true || newData.parent().parent().parent().child('conversations').child($convId).child('members').child(auth.uid).val() === true) && !data.exists() && newData.exists()",
+          ".validate": "newData.hasChildren(['senderId', 'type', 'createdAt']) && newData.child('senderId').val() === auth.uid",
+          "recalled": {
+            ".write": "auth != null && root.child('conversations').child($convId).child('members').child(auth.uid).val() === true && data.parent().child('senderId').val() === auth.uid",
+            ".validate": "newData.val() === true"
+          },
+          "reactions": {
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid && root.child('conversations').child($convId).child('members').child(auth.uid).val() === true",
+              ".validate": "newData.isString() && newData.val().length <= 8"
+            }
           }
-        },
-        "$other": { ".validate": false }
+        }
+      }
+    },
+    "userChats": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$convId": {
+          ".write": "auth != null && (auth.uid === $uid || root.child('conversations').child($convId).child('members').child(auth.uid).val() === true || newData.parent().parent().parent().child('conversations').child($convId).child('members').child(auth.uid).val() === true)"
+        }
+      }
+    },
+    "readStatus": {
+      "$convId": {
+        ".read": "auth != null && root.child('conversations').child($convId).child('members').child(auth.uid).val() === true",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && root.child('conversations').child($convId).child('members').child(auth.uid).val() === true",
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+    "typing": {
+      "$convId": {
+        ".read": "auth != null && root.child('conversations').child($convId).child('members').child(auth.uid).val() === true",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && root.child('conversations').child($convId).child('members').child(auth.uid).val() === true",
+          ".validate": "newData.val() === true"
+        }
+      }
+    },
+    "notifications": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$notifId": {
+          ".write": "auth != null && (auth.uid === $uid || (!data.exists() && newData.child('fromUid').val() === auth.uid))"
+        }
       }
     }
   }

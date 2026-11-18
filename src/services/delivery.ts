@@ -1,5 +1,20 @@
-﻿import type { Conversation, Message } from './chat';
+import type { Conversation, Message } from './chat';
+
+export function preview(m?: Pick<Message, 'type' | 'text' | 'recalled'>) {
+  if (m?.recalled) {
+    return 'Tin nhắn đã được thu hồi';
+  }
+  if (m?.type === 'image') {
+    return '📷 Hình ảnh';
+  }
+  if (m?.type === 'location') {
+    return '📍 Vị trí';
+  }
+  return m?.text || '';
+}
+
 export type DeliveryState = 'sending' | 'sent' | 'seen' | 'failed';
+
 export interface OutgoingMessage {
   id: string;
   peerId: string;
@@ -7,14 +22,23 @@ export interface OutgoingMessage {
   message: Message;
   state: Exclude<DeliveryState, 'seen'>;
   error?: string;
+  localImageUri?: string;
+  imageMeta?: { fileName?: string; type?: string };
+  memberUids?: string[];
+  isGroup?: boolean;
+  groupName?: string;
+  senderName?: string;
 }
+
 export type Outbox = Record<string, OutgoingMessage>;
+
 export const deliveryLabels: Record<DeliveryState, string> = {
   sending: 'Đang gửi',
-  sent: 'Đã gửi · Chưa xem',
+  sent: 'Đã gửi',
   seen: 'Đã xem',
   failed: 'Gửi thất bại',
 };
+
 export function deliveryState(
   key: string,
   peerRead?: string,
@@ -28,12 +52,28 @@ export function deliveryState(
   }
   return outgoing?.state || 'sent';
 }
+
+export function deliveryStateByTime(
+  createdAt: number,
+  peerReadAt?: number,
+  outgoing?: OutgoingMessage,
+): DeliveryState {
+  if (outgoing?.state === 'sending' || outgoing?.state === 'failed') {
+    return outgoing.state;
+  }
+  if (peerReadAt && createdAt && peerReadAt >= createdAt) {
+    return 'seen';
+  }
+  return outgoing?.state || 'sent';
+}
+
 export function mergedMessages(
   chat: Conversation | undefined,
   conversationId: string,
   outbox: Outbox,
+  externalMessages?: Record<string, Message>,
 ) {
-  const messages = { ...chat?.messages };
+  const messages = { ...(externalMessages || chat?.messages) };
   Object.values(outbox)
     .filter(m => m.conversationId === conversationId)
     .forEach(m => {
@@ -43,16 +83,17 @@ export function mergedMessages(
     a < b ? -1 : a > b ? 1 : 0,
   );
 }
+
 export function lastMessageText(
   message: Message,
   ownId: string,
   peerName: string,
 ) {
   const author = message.senderId === ownId ? 'Bạn' : peerName;
-  const content =
-    message.type === 'location' ? 'Đã gửi một vị trí' : message.text || '';
+  const content = preview(message);
   return `${author}: ${content}`;
 }
+
 export function listTime(timestamp: number) {
   const date = new Date(timestamp);
   const today = new Date();
@@ -64,6 +105,7 @@ export function listTime(timestamp: number) {
   }
   return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 }
+
 export function dateDivider(timestamp: number) {
   const date = new Date(timestamp);
   const today = new Date();

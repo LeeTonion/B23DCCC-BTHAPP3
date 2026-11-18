@@ -1,12 +1,15 @@
-﻿import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { ChatProvider } from '../context/ChatContext';
 import { ChatDetailScreen } from '../screens/ChatDetailScreen';
+import { CreateGroupScreen } from '../screens/CreateGroupScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { MainTabs } from './MainTabs';
 import type { RootStackParamList } from './types';
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
 export function RootNavigator() {
   const { isLoggedIn, loading } = useAuth();
   if (loading) {
@@ -32,6 +35,11 @@ export function RootNavigator() {
             component={ChatDetailScreen}
             options={{ headerShown: false }}
           />
+          <Stack.Screen
+            name="CreateGroup"
+            component={CreateGroupScreen}
+            options={{ headerShown: false }}
+          />
         </>
       ) : (
         <>
@@ -51,6 +59,7 @@ export function RootNavigator() {
   );
   return isLoggedIn ? <ChatProvider>{screens}</ChatProvider> : screens;
 }
+
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

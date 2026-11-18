@@ -77,8 +77,9 @@ yarn-error.log
 .cache/
 submission/
 
-# Local Firebase client configuration (commit the example only)
+# Local Firebase & Cloudinary client configuration (commit the examples only)
 /src/services/firebaseConfig.ts
+/src/services/cloudinaryConfig.ts
 **/google-services.json
 **/GoogleService-Info.plist
 
