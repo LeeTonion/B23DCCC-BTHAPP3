@@ -1,0 +1,55 @@
+BÁO CÁO NGẮN: GIẢI THÍCH LUẬT BẢO MẬT FIREBASE REALTIME DATABASE
+=====================================================================
+
+1. Nguyên tắc chung
+-------------------
+Tệp `database.rules.json` áp dụng nguyên tắc mặc định từ chối toàn bộ (`.read: false`, `.write: false` ở gốc `/`) và chỉ mở quyền tối thiểu cho từng nhánh dữ liệu khi người dùng đã đăng nhập (`auth != null`).
+
+2. Giải thích chi tiết từng nhánh dữ liệu
+-----------------------------------------
+a) `users/$uid`
+- Đọc (`.read`): Mọi tài khoản đã đăng nhập (`auth != null`) đều đọc được danh bạ (`name`, `avatarUrl`, `lastSeen`).
+- Ghi (`.write`): Chỉ chính chủ tài khoản (`auth.uid === $uid`) mới được sửa hồ sơ của mình. Ràng buộc `.validate` yêu cầu có `name` hợp lệ (1–100 ký tự), `avatarUrl` là chuỗi (≤ 1000 ký tự), `lastSeen` là số. Không cho phép ghi trường lạ (`$other: false`).
+
+b) `presence/$uid/$session` và `activeChat/$uid`
+- Ghi: Chỉ chính chủ (`auth.uid === $uid`) được cập nhật trạng thái online hoặc cuộc trò chuyện đang mở. Kết hợp `onDisconnect()` để tự động xóa khi mất kết nối đột ngột.
+
+c) `conversations/$convId`
+- Đọc: Chỉ thành viên có `members[auth.uid] === true` mới đọc được thông tin cuộc trò chuyện.
+- Ghi: Chỉ người đang là thành viên (hoặc người tạo nhóm có mặt trong `newData.child('members').child(auth.uid)`) mới được tạo hoặc cập nhật nhóm (đổi tên, thêm/xóa thành viên). Mỗi `$uid` trong `members` phải tồn tại trong `/users`.
+
+d) `messages/$convId/$msgId`
+- Đọc: Chỉ thành viên của cuộc trò chuyện (`root.child('conversations').child($convId).child('members').child(auth.uid).val() === true`) mới đọc được tin nhắn.
+- Tạo tin mới: Chỉ thành viên mới được ghi tin nhắn mới (`!data.exists() && newData.exists()`), bắt buộc `senderId === auth.uid`, đủ các trường `senderId`, `type`, `createdAt`.
+- Thu hồi tin (`recalled`): Chỉ chính người gửi tin nhắn (`data.parent().child('senderId').val() === auth.uid`) mới được đặt `recalled: true`. Không cho phép xóa hoặc sửa nội dung tin nhắn đã gửi.
+- Thả cảm xúc (`reactions/$uid`): Chỉ thành viên cuộc trò chuyện và chỉ được ghi vào khóa `$uid` trùng với `auth.uid` của chính mình.
+
+e) `userChats/$uid/$convId`
+- Đọc: Chỉ chủ sở hữu (`auth.uid === $uid`) mới đọc được danh sách đoạn chat và số tin chưa đọc của mình.
+- Ghi: Chủ sở hữu (khi đánh dấu đã đọc `unread: 0`) hoặc thành viên cùng cuộc trò chuyện (khi gửi tin mới bằng multi-path `update()` kèm `increment(1)`).
+
+f) `readStatus/$convId/$uid` và `typing/$convId/$uid`
+- Đọc: Chỉ thành viên của `$convId`.
+- Ghi: Chỉ chính người dùng đó (`auth.uid === $uid`) và là thành viên của `$convId` mới được ghi thời điểm đọc cuối (`readStatus`) hoặc trạng thái đang soạn tin (`typing`).
+
+g) `notifications/$uid/$notifId`
+- Đọc: Chỉ người nhận (`auth.uid === $uid`).
+- Ghi: Chỉ người nhận (đánh dấu `read: true`) hoặc người gửi hợp lệ khi tạo thông báo mới (`!data.exists() && newData.child('fromUid').val() === auth.uid`).
+
+3. Chứng minh thao tác bị từ chối (PERMISSION_DENIED)
+-------------------------------------------------------
+Cách kiểm chứng nhanh trên Firebase Console → Realtime Database → Rules → Rules Playground:
+
+- Trường hợp 1 (Đọc trộm tin nhắn của cuộc trò chuyện không tham gia):
+  + Simulation type: `get`
+  + Location: `/messages/<convId_cua_A_va_B>`
+  + Authenticated: bật, UID = `<uid_cua_C>` (không nằm trong `members`)
+  + Kết quả: **Simulated read denied** (`PERMISSION_DENIED`), vì rule yêu cầu `root.child('conversations').child($convId).child('members').child(auth.uid).val() === true`.
+
+- Trường hợp 2 (Thu hồi tin nhắn của người khác hoặc ghi hộ trạng thái typing):
+  + Simulation type: `set`
+  + Location: `/messages/<convId>/<msgId_cua_A>/recalled` với value `true` (hoặc `/typing/<convId>/<uid_cua_A>` với value `true`)
+  + Authenticated: bật, UID = `<uid_cua_B>`
+  + Kết quả: **Simulated write denied** (`PERMISSION_DENIED`), vì `senderId !== auth.uid` (và `auth.uid !== $uid` với `typing`).
+
+(Chụp ảnh kết quả màu đỏ "Simulated read/write denied" trong Rules Playground hoặc ảnh thông báo lỗi `PERMISSION_DENIED` trên ứng dụng để đính kèm vào báo cáo.)

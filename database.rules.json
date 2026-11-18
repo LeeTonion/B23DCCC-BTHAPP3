@@ -63,7 +63,7 @@
         ".read": "auth != null && root.child('conversations').child($convId).child('members').child(auth.uid).val() === true",
         "$msgId": {
           ".write": "auth != null && (root.child('conversations').child($convId).child('members').child(auth.uid).val() === true || newData.parent().parent().parent().child('conversations').child($convId).child('members').child(auth.uid).val() === true) && !data.exists() && newData.exists()",
-          ".validate": "newData.hasChildren(['senderId', 'type', 'createdAt']) && newData.child('senderId').val() === auth.uid",
+          ".validate": "newData.hasChildren(['senderId', 'type', 'createdAt']) && (!data.exists() ? newData.child('senderId').val() === auth.uid : newData.child('senderId').val() === data.child('senderId').val())",
           "recalled": {
             ".write": "auth != null && root.child('conversations').child($convId).child('members').child(auth.uid).val() === true && data.parent().child('senderId').val() === auth.uid",
             ".validate": "newData.val() === true"

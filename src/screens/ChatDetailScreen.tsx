@@ -911,7 +911,6 @@ export function ChatDetailScreen({
                           </View>
                         ) : (
                           <Text
-                            selectable
                             style={[
                               styles.message,
                               mine && styles.white,

@@ -1,4 +1,4 @@
-﻿# Chat Firebase — Bài thực hành tiếp theo Bài 4
+# Chat Firebase — Bài thực hành tiếp theo Bài 4
 
 Ứng dụng React Native CLI, React Navigation, Firebase JS SDK Authentication + Realtime Database và Geolocation. Không dùng Expo. Dữ liệu màn hình lấy từ Firebase; không có chế độ giả lập chat.
 
